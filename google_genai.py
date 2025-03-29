@@ -1,8 +1,11 @@
 """
-title: Google Gemini Pipe
+title: Gemini API Rotation Pipe
+id: gemini_api_rotation_pipe
 author: huyhvq
+author_url: https://github.com/huyhvq
 repo_url: https://github.com/huyhvq/google_genai
 version: 1.0.0
+requirements: google-genai==1.8.0
 license: MIT
 """
 
