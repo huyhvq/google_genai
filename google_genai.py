@@ -1,7 +1,7 @@
 """
 title: Google Gemini Pipe
 author: huyhvq
-repo_url: https://github.com/open-webui/community-pipes/tree/main/pipes/google_genai
+repo_url: https://github.com/huyhvq/google_genai
 version: 1.0.0
 license: MIT
 """
