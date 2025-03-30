@@ -20,7 +20,7 @@ from google.generativeai.types import GenerationConfig, GenerateContentResponse
 from typing import List, Union, Iterator, Callable, Awaitable
 
 # Set to True for detailed logging
-DEBUG = True
+DEBUG = False
 
 
 class Pipe:
@@ -149,83 +149,83 @@ class Pipe:
     def get_google_models(self):
         """Retrieve available Google models."""
         try:
-           if not self.valves.GOOGLE_API_KEY:
-               if DEBUG:
-                   print("[get_google_models] GOOGLE_API_KEY is not set.")
-               return [
-                   {
-                       "id": "error-no-key",
-                       "name": "API Key missing. Please set GOOGLE_API_KEY in Valves.",
-                       "error": "API Key missing",
-                   }
-               ]
+            if not self.valves.GOOGLE_API_KEY:
+                if DEBUG:
+                    print("[get_google_models] GOOGLE_API_KEY is not set.")
+                return [
+                    {
+                        "id": "error-no-key",
+                        "name": "API Key missing. Please set GOOGLE_API_KEY in Valves.",
+                        "error": "API Key missing",
+                    }
+                ]
 
-           genai.configure(api_key=self.valves.GOOGLE_API_KEY)
-           models = genai.list_models()
-           models_list = list(models)
+            genai.configure(api_key=self.get_next_api_key())
+            models = genai.list_models()
+            models_list = list(models)
 
-           if DEBUG:
-               print(
-                   f"[get_google_models] Retrieved {len(models_list)} models raw from Google."
-               )
+            if DEBUG:
+                print(
+                    f"[get_google_models] Retrieved {len(models_list)} models raw from Google."
+                )
 
-           filtered_models = []
-           for model in models_list:
-               # Check if the model supports content generation
-               if "generateContent" in model.supported_generation_methods:
-                   model_id = self.strip_prefix(model.name)
-                   filtered_models.append(
-                       {
-                           "id": model_id,
-                           "name": model.display_name,
-                           # Include other potentially useful info if available
-                           "description": getattr(model, "description", None),
-                           "context_window": getattr(model, "input_token_limit", None),
-                           "output_window": getattr(model, "output_token_limit", None),
-                           "temperature": getattr(
-                               model, "temperature", None
-                           ),  # May not be available here
-                           "top_p": getattr(
-                               model, "top_p", None
-                           ),  # May not be available here
-                           "top_k": getattr(
-                               model, "top_k", None
-                           ),  # May not be available here
-                       }
-                   )
+            filtered_models = []
+            for model in models_list:
+                # Check if the model supports content generation
+                if "generateContent" in model.supported_generation_methods:
+                    model_id = self.strip_prefix(model.name)
+                    filtered_models.append(
+                        {
+                            "id": model_id,
+                            "name": model.display_name,
+                            # Include other potentially useful info if available
+                            "description": getattr(model, "description", None),
+                            "context_window": getattr(model, "input_token_limit", None),
+                            "output_window": getattr(model, "output_token_limit", None),
+                            "temperature": getattr(
+                                model, "temperature", None
+                            ),  # May not be available here
+                            "top_p": getattr(
+                                model, "top_p", None
+                            ),  # May not be available here
+                            "top_k": getattr(
+                                model, "top_k", None
+                            ),  # May not be available here
+                        }
+                    )
 
-           if not filtered_models:
-               if DEBUG:
-                   print(
-                       "[get_google_models] No models found supporting 'generateContent'."
-                   )
-               return [
-                   {
-                       "id": "error-no-models",
-                       "name": "No compatible Google models found.",
-                       "error": "No compatible models",
-                   }
-               ]
+            if not filtered_models:
+                if DEBUG:
+                    print(
+                        "[get_google_models] No models found supporting 'generateContent'."
+                    )
+                return [
+                    {
+                        "id": "error-no-models",
+                        "name": "No compatible Google models found.",
+                        "error": "No compatible models",
+                    }
+                ]
 
-           if DEBUG:
-               print(
-                   f"[get_google_models] Found {len(filtered_models)} compatible models."
-               )
-           return filtered_models
+            if DEBUG:
+                print(
+                    f"[get_google_models] Found {len(filtered_models)} compatible models."
+                )
+            return filtered_models
 
         except Exception as e:
-           if DEBUG:
-               print(f"[get_google_models] Error fetching Google models: {e}")
-           return [
-               {
-                   "id": "error-fetch",
-                   "name": f"Could not fetch models: {str(e)}",
-                   "error": str(e),
-               }
-           ]
+            if DEBUG:
+                print(f"[get_google_models] Error fetching Google models: {e}")
+            return [
+                {
+                    "id": "error-fetch",
+                    "name": f"Could not fetch models: {str(e)}",
+                    "error": str(e),
+                }
+            ]
         finally:
-           if DEBUG:
-               print("[get_google_models] Completed fetching Google models.")
+            if DEBUG:
+                print("[get_google_models] Completed fetching Google models.")
 
     def pipes(self) -> List[dict]:
         """Register all available Google models that support generateContent."""
@@ -266,15 +266,16 @@ class Pipe:
             raw_model_id = body.get("model", "")
             model_id = self.strip_prefix(raw_model_id).split(".", 1)[-1]
             if "thinking" in model_id or "gemini-2.5-pro" in model_id:
-                enclosure = f"""<details>
-<summary>Click to expand thoughts</summary>
-Gemini SDK no more provided thought.
-</details>""".strip()
-                message_event = {
-                    "type": "message",
-                    "data": {"content": enclosure},
-                }
-                await __event_emitter__(message_event)
+                await __event_emitter__(
+                    {
+                        "type": "status",
+                        "data": {
+                            "description": "Thinking...",
+                            "done": False,
+                            "hidden": False,
+                        },
+                    }
+                )
 
             if DEBUG:
                 print(f"[pipe] Using model ID: '{model_id}' (raw: '{raw_model_id}')")
@@ -536,6 +537,17 @@ Gemini SDK no more provided thought.
                             print(f"[pipe] Error logging response details: {log_err}")
 
                 # --- Process Response ---
+                if "thinking" in model_id or "gemini-2.5-pro" in model_id:
+                    await __event_emitter__(
+                        {
+                            "type": "status",
+                            "data": {
+                                "description": "Thoughts",
+                                "done": True,
+                                "hidden": False,
+                            },
+                        }
+                    )
                 if body.get("stream") == True:
                     try:
                         for chunk in response:
